@@ -201,26 +201,36 @@ def track():
 
 @app.route("/api/events", methods=["GET"])
 def get_events():
-    limit = min(int(request.args.get("limit", 20)), 100)
+    limit = min(int(request.args.get("limit", 50)), 100)
     with _buffer_lock:
         recent = list(_event_buffer[-limit:])
 
-    # --- INSIGHT 1: Device Breakdown ---
-    device_counts = {"desktop": 0, "mobile": 0, "tablet": 0}
-    for e in recent:
-        # Get the deviceType we enriched in the track() function
-        d_type = e.get("deviceType", "desktop")
-        if d_type in device_counts:
-            device_counts[d_type] += 1
+    # The dashboard HTML expects these specific keys in a 'summary' object
+    summary = {
+        "page_view": 0,
+        "add_to_cart": 0,
+        "purchase": 0,
+        "product_click": 0
+    }
+    
+    device_summary = {"desktop": 0, "mobile": 0}
 
-    # --- INSIGHT 2: Spike Detection ---
-    # Since our SQL triggers a spike at > 15, we do the same here
-    is_spike = len(recent) > 15 
+    for e in recent:
+        # Update Event Types
+        etype = e.get("event_type")
+        if etype in summary:
+            summary[etype] += 1
+            
+        # Update Devices
+        dtype = e.get("deviceType", "desktop")
+        if dtype in device_summary:
+            device_summary[dtype] += 1
 
     return jsonify({
         "events": recent,
-        "device_summary": device_counts,
-        "is_spike": is_spike,
+        "summary": summary,         # This fixes the top boxes!
+        "device_summary": device_summary,
+        "is_spike": len(recent) > 15,
         "total": len(recent)
     }), 200
 
