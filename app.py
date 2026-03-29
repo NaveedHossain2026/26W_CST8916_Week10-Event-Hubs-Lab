@@ -169,11 +169,22 @@ def track():
         abort(400)
 
     # Enrich the event with a server-side timestamp
+    data = request.json
+
+    # Enrich the event while PRESERVING the new fields from the browser
     event = {
-        "event_type": request.json.get("event_type", "unknown"),
-        "page":       request.json.get("page", "/"),
-        "product_id": request.json.get("product_id"),
-        "user_id":    request.json.get("user_id", "anonymous"),
+        "event_type": data.get("event_type", "unknown"),
+        "page":       data.get("page", "/"),
+        "product_id": data.get("product_id"),
+        "user_id":    data.get("user_id", "anonymous"),
+        "session_id": data.get("session_id"), # Added this
+        
+        # --- ADD THESE THREE LINES ---
+        "deviceType": data.get("deviceType", "desktop"),
+        "browser":    data.get("browser", "unknown"),
+        "os":         data.get("os", "unknown"),
+        # -----------------------------
+
         "timestamp":  datetime.now(timezone.utc).isoformat(),
     }
 
