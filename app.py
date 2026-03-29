@@ -201,32 +201,28 @@ def track():
 
 @app.route("/api/events", methods=["GET"])
 def get_events():
-    """
-    Return the buffered events as JSON.
-    The dashboard polls this endpoint every 2 seconds.
-
-    Optional query param:  ?limit=20  (default 20, max 50)
-    """
-    try:
-        # request.args.get("limit", 20) reads ?limit=N from the URL, defaulting to 20.
-        # int() converts it from a string (all URL params are strings) to an integer.
-        # min(..., MAX_BUFFER) clamps the value so callers can never request more
-        # events than the buffer holds — e.g. ?limit=999 silently becomes 50.
-        limit = min(int(request.args.get("limit", 20)), MAX_BUFFER)
-    except ValueError:
-        # int() raises ValueError if the param is non-numeric (e.g. ?limit=abc)
-        limit = 20
-
+    limit = min(int(request.args.get("limit", 20)), 100)
     with _buffer_lock:
         recent = list(_event_buffer[-limit:])
 
-    # Build a simple summary for the dashboard
-    summary = {}
+    # --- INSIGHT 1: Device Breakdown ---
+    device_counts = {"desktop": 0, "mobile": 0, "tablet": 0}
     for e in recent:
-        et = e.get("event_type", "unknown")
-        summary[et] = summary.get(et, 0) + 1
+        # Get the deviceType we enriched in the track() function
+        d_type = e.get("deviceType", "desktop")
+        if d_type in device_counts:
+            device_counts[d_type] += 1
 
-    return jsonify({"events": recent, "summary": summary, "total": len(recent)}), 200
+    # --- INSIGHT 2: Spike Detection ---
+    # Since our SQL triggers a spike at > 15, we do the same here
+    is_spike = len(recent) > 15 
+
+    return jsonify({
+        "events": recent,
+        "device_summary": device_counts,
+        "is_spike": is_spike,
+        "total": len(recent)
+    }), 200
 
 
 # ---------------------------------------------------------------------------
